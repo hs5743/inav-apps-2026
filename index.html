@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>人際導航員 Firebase 版</title>
+  <title>人際導航員</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@600;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -20,7 +20,7 @@
 
   <section id="loginScreen" class="screen active login-screen">
     <div class="hero">
-      <div class="brand-pill"><span class="material-symbols-outlined">explore</span> Firebase 即時版</div>
+      <div class="brand-pill"><span class="material-symbols-outlined">explore</span> 即時協作版</div>
       <h1>人際導航員</h1>
       <p>組長建立房間，組員用同一組代碼加入。讀懂情境、選擇策略、輪流說明理由，最後投票找出安全、尊重、有效的做法。</p>
       <div class="map-hero">
@@ -37,7 +37,7 @@
         <span class="material-symbols-outlined">meeting_room</span>
         <div>
           <h2>進入遊戲房間</h2>
-          <p>資料會同步到 Firebase Firestore。</p>
+          <p>房間資料會即時同步。</p>
         </div>
       </div>
       <input id="playerName" class="field" maxlength="16" placeholder="你的姓名或座號">
@@ -51,6 +51,7 @@
         <button class="btn mint" type="button" id="createBtn"><span class="material-symbols-outlined">stars</span>建立房間</button>
       </div>
       <button class="btn ghost full" type="button" id="adminBtn"><span class="material-symbols-outlined">admin_panel_settings</span>教師後台</button>
+      <p class="privacy-note">請使用座號、暱稱或組別，不輸入學生真名。教師後台使用 Google 登入，不在網站公開密碼。</p>
     </div>
   </section>
 
@@ -123,13 +124,22 @@
         <h1>教師後台</h1>
         <button class="btn ghost" type="button" id="backLoginBtn"><span class="material-symbols-outlined">arrow_back</span>返回</button>
       </div>
-      <div class="admin-note">Firebase Pages 靜態版無伺服器密碼保護；請只用於課堂管理與測試資料清理。</div>
-      <button class="btn primary" type="button" id="loadAdminBtn"><span class="material-symbols-outlined">sync</span>重新整理房間</button>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>房間</th><th>階段</th><th>輪次</th><th>人數</th><th>更新</th><th></th></tr></thead>
-          <tbody id="adminRows"></tbody>
-        </table>
+      <div class="admin-note">請用授權教師帳號登入。後台權限由系統規則保護，不使用前端密碼。</div>
+      <div class="admin-auth">
+        <button class="btn primary" type="button" id="adminLoginBtn"><span class="material-symbols-outlined">login</span>Google 登入教師後台</button>
+        <div id="adminUserLabel" class="sync-meta">尚未登入</div>
+      </div>
+      <div id="adminDashboard" class="hidden">
+        <div class="button-grid">
+          <button class="btn primary" type="button" id="loadAdminBtn"><span class="material-symbols-outlined">sync</span>重新整理房間</button>
+          <button class="btn ghost" type="button" id="adminLogoutBtn"><span class="material-symbols-outlined">logout</span>登出</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>房間</th><th>階段</th><th>輪次</th><th>人數</th><th>更新</th><th></th></tr></thead>
+            <tbody id="adminRows"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </section>

@@ -1,14 +1,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /rooms/{roomId} {
-      allow read, write: if true;
-      match /players/{playerId} {
-        allow read, write: if true;
-      }
+    function isTeacher() {
+      return request.auth != null
+        && request.auth.token.email in ['hs5743@gapp.hcc.edu.tw'];
     }
-    match /test_collection/{document} {
-      allow read, write: if true;
+
+    match /rooms/{roomId} {
+      allow get: if true;
+      allow list: if isTeacher();
+      allow create, update: if true;
+      allow delete: if isTeacher();
+      match /players/{playerId} {
+        allow read, create, update: if true;
+        allow delete: if isTeacher();
+      }
     }
     match /{document=**} {
       allow read, write: if false;

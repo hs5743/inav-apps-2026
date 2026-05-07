@@ -89,6 +89,16 @@ h1, h2, p { margin-top: 0; }
 .field:focus { border-color: var(--ocean); box-shadow: 0 0 0 4px rgba(23,107,135,.14); }
 .uppercase { text-transform: uppercase; }
 .small-label { margin-bottom: 8px; color: var(--muted); font-weight: 900; font-size: 13px; }
+.privacy-note {
+  margin: 0;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+  padding: 11px 13px;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.6;
+}
 .avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .avatar-choice {
   border: 2px solid transparent;
@@ -232,6 +242,7 @@ h1, h2, p { margin-top: 0; }
 .admin-screen { align-items: start; padding: 24px; }
 .admin-panel { width: min(1040px, 100%); margin: 0 auto; padding: 22px; }
 .admin-note { padding: 12px; border-radius: 12px; background: #fff7ed; color: #9a3412; font-weight: 900; margin-bottom: 12px; }
+.admin-auth { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
 .table-wrap { overflow: auto; margin-top: 14px; }
 table { width: 100%; border-collapse: collapse; min-width: 760px; }
 th, td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; font-weight: 800; }

@@ -1,5 +1,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import {
+  getAuth,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+import {
   collection,
   deleteDoc,
   doc,
@@ -10,7 +17,6 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   updateDoc
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
@@ -26,6 +32,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+const ADMIN_EMAILS = ["hs5743@gapp.hcc.edu.tw"];
 const SCENARIOS = window.SCENARIOS || [];
 const STRATEGIES = window.STRATEGIES || [];
 const byId = id => document.getElementById(id);
@@ -177,6 +185,7 @@ async function login(isLeader) {
       const rRef = roomRef();
       const pRef = playerRef();
       const roomSnap = await tx.get(rRef);
+      const playerSnap = await tx.get(pRef);
       if (!roomSnap.exists()) {
         if (!amILeader) throw new Error("房間尚未建立，請確認房間代碼或請組長先建立。");
         tx.set(rRef, {
@@ -190,7 +199,6 @@ async function login(isLeader) {
           updatedAt: serverTimestamp()
         });
       }
-      const playerSnap = await tx.get(pRef);
       const base = playerSnap.exists() ? playerSnap.data() : {};
       tx.set(pRef, {
         name: myName,
@@ -462,6 +470,7 @@ async function changeState(nextState) {
   if (!amILeader) return toast("只有組長可以操作。", "error");
   showLoading("階段切換中...");
   try {
+    const playerSnaps = nextState === "PLAYING" ? await getDocs(playersRef()) : null;
     await runTransaction(db, async tx => {
       const rSnap = await tx.get(roomRef());
       if (!rSnap.exists()) throw new Error("找不到房間。");
@@ -473,7 +482,6 @@ async function changeState(nextState) {
         patch.scenarioIdx = pick.index;
         patch.scenarioHistory = pick.history;
         patch.leaderMessage = `第 ${patch.roundCount} 輪開始。請先讀情境，再選一張最合適的策略卡。`;
-        const playerSnaps = await getDocs(playersRef());
         playerSnaps.docs.forEach(playerDoc => {
           const p = playerDoc.data();
           tx.update(doc(db, "rooms", myRoom, "players", playerDoc.id), {
@@ -528,6 +536,11 @@ function leaveGame() {
 }
 
 async function loadAdminData() {
+  const user = auth.currentUser;
+  if (!user || !ADMIN_EMAILS.includes(user.email)) {
+    toast("請先使用授權教師帳號登入。", "error");
+    return;
+  }
   showLoading("讀取房間資料...");
   try {
     const roomsSnap = await getDocs(query(collection(db, "rooms")));
@@ -561,6 +574,11 @@ async function loadAdminData() {
 }
 
 async function deleteRoom(room) {
+  const user = auth.currentUser;
+  if (!user || !ADMIN_EMAILS.includes(user.email)) {
+    toast("請先使用授權教師帳號登入。", "error");
+    return;
+  }
   if (!confirm(`確定要解散房間「${room}」並刪除玩家資料？`)) return;
   showLoading("刪除房間中...");
   try {
@@ -575,14 +593,40 @@ async function deleteRoom(room) {
   }
 }
 
+async function adminLogin() {
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (error) {
+    toast(error.message || "Google 登入失敗，請確認登入功能已啟用。", "error");
+  }
+}
+
+async function adminLogout() {
+  await signOut(auth);
+}
+
+function renderAdminAuth(user) {
+  const allowed = Boolean(user && ADMIN_EMAILS.includes(user.email));
+  byId("adminUserLabel").textContent = user ? `${user.email}${allowed ? "｜已授權" : "｜未授權"}` : "尚未登入";
+  byId("adminDashboard").classList.toggle("hidden", !allowed);
+  byId("adminLoginBtn").classList.toggle("hidden", allowed);
+  if (!allowed) byId("adminRows").innerHTML = "";
+  if (allowed && byId("adminScreen").classList.contains("active")) loadAdminData();
+}
+
 function bindEvents() {
   byId("joinBtn").addEventListener("click", () => login(false));
   byId("createBtn").addEventListener("click", () => login(true));
-  byId("adminBtn").addEventListener("click", () => screen("adminScreen"));
+  byId("adminBtn").addEventListener("click", () => {
+    screen("adminScreen");
+    renderAdminAuth(auth.currentUser);
+  });
   byId("backLoginBtn").addEventListener("click", () => screen("loginScreen"));
   byId("refreshBtn").addEventListener("click", refreshState);
   byId("leaveBtn").addEventListener("click", leaveGame);
   byId("broadcastBtn").addEventListener("click", sendBroadcast);
+  byId("adminLoginBtn").addEventListener("click", adminLogin);
+  byId("adminLogoutBtn").addEventListener("click", adminLogout);
   byId("loadAdminBtn").addEventListener("click", loadAdminData);
   byId("closeModalBtn").addEventListener("click", closeCardModal);
   byId("cancelCardBtn").addEventListener("click", closeCardModal);
@@ -592,3 +636,4 @@ function bindEvents() {
 
 renderAvatarPicker();
 bindEvents();
+onAuthStateChanged(auth, renderAdminAuth);

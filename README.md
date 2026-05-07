@@ -7,7 +7,7 @@
 - 組長建立房間，組員用同一組代碼加入
 - Firestore 即時同步房間、玩家、手牌、出牌與投票資料
 - 組長可開始任務、進入投票、公布結果、結束遊戲
-- 教師後台可查看房間並刪除測試房間
+- 教師後台使用 Google 登入，不把教師密碼放在網站程式碼中
 - 可直接部署到 GitHub Pages
 
 ## Firebase 資料
@@ -29,4 +29,4 @@ npx.cmd serve .
 
 ## 安全提醒
 
-目前為課堂展示版，Firestore 規則允許公開讀寫 `rooms` 集合，方便學生免登入使用。正式長期使用時，建議加上 Firebase Authentication、App Check 或房間代碼限制規則。
+目前為課堂展示版，學生端允許公開建立/更新房間資料，方便免登入使用；教師後台使用 Firebase Authentication 的 Google 登入與 Firestore 規則保護。正式長期使用時，建議再加上 App Check 或更細的房間代碼限制規則。
