@@ -173,6 +173,16 @@ function handFromDocs(hand) {
   return (Array.isArray(hand) ? hand : []).map(cardFromDoc).filter(Boolean);
 }
 
+function normalizeStoredHand(hand) {
+  const cards = handFromDocs(hand);
+  return handToDocs(cards.length ? cards : dealHand());
+}
+
+function normalizeStoredCard(card) {
+  const normalized = cardFromDoc(card);
+  return normalized ? cardToDoc(normalized) : null;
+}
+
 function pickScenario(history = []) {
   const recent = Array.isArray(history) ? history.slice(-8) : [];
   let index = Math.floor(Math.random() * SCENARIOS.length);
@@ -229,8 +239,8 @@ async function login(isLeader) {
         name: myName,
         isLeader: Boolean(base.isLeader || amILeader),
         avatarKey: selectedAvatarKey,
-        hand: Array.isArray(base.hand) && base.hand.length ? base.hand : handToDocs(dealHand()),
-        playedCard: base.playedCard || null,
+        hand: normalizeStoredHand(base.hand),
+        playedCard: normalizeStoredCard(base.playedCard),
         customText: base.customText || "",
         score: Number(base.score) || 0,
         votedFor: base.votedFor || "",
@@ -622,7 +632,10 @@ async function adminLogin() {
   try {
     await signInWithPopup(auth, new GoogleAuthProvider());
   } catch (error) {
-    toast(error.message || "Google 登入失敗，請確認登入功能已啟用。", "error");
+    const message = error && error.code === "auth/configuration-not-found"
+      ? "Google 登入尚未啟用，請先到管理主控台開啟登入功能。"
+      : "Google 登入失敗，請稍後再試。";
+    toast(message, "error");
   }
 }
 
