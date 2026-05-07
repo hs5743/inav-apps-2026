@@ -148,6 +148,31 @@ function dealHand() {
   return hand;
 }
 
+function cardToDoc(card) {
+  return {
+    id: card?.[0] || "",
+    category: card?.[1] || "",
+    title: card?.[2] || "",
+    guide: card?.[3] || "",
+    skill: card?.[4] || "",
+    tip: card?.[5] || ""
+  };
+}
+
+function cardFromDoc(card) {
+  if (Array.isArray(card)) return card;
+  if (!card || typeof card !== "object") return null;
+  return [card.id, card.category, card.title, card.guide, card.skill, card.tip];
+}
+
+function handToDocs(hand) {
+  return (Array.isArray(hand) ? hand : []).map(cardToDoc);
+}
+
+function handFromDocs(hand) {
+  return (Array.isArray(hand) ? hand : []).map(cardFromDoc).filter(Boolean);
+}
+
 function pickScenario(history = []) {
   const recent = Array.isArray(history) ? history.slice(-8) : [];
   let index = Math.floor(Math.random() * SCENARIOS.length);
@@ -204,7 +229,7 @@ async function login(isLeader) {
         name: myName,
         isLeader: Boolean(base.isLeader || amILeader),
         avatarKey: selectedAvatarKey,
-        hand: Array.isArray(base.hand) && base.hand.length ? base.hand : dealHand(),
+        hand: Array.isArray(base.hand) && base.hand.length ? base.hand : handToDocs(dealHand()),
         playedCard: base.playedCard || null,
         customText: base.customText || "",
         score: Number(base.score) || 0,
@@ -268,7 +293,7 @@ function renderState(state) {
   const me = state.players.find(p => p.name === myName);
   if (!me) return;
   currentState = state;
-  currentHand = Array.isArray(me.hand) ? me.hand : [];
+  currentHand = handFromDocs(me.hand);
   selectedAvatarKey = me.avatarKey || selectedAvatarKey;
   const avatar = avatarMeta(me.avatarKey);
   byId("uiRoom").textContent = state.roomID;
@@ -404,10 +429,10 @@ async function playActiveCard() {
       const player = pSnap.data();
       if (room.roundState !== "PLAYING") throw new Error("目前不是出牌階段。");
       if (player.playedCard) throw new Error("你本輪已經出牌了。");
-      const hand = Array.isArray(player.hand) ? player.hand : [];
+      const hand = handFromDocs(player.hand);
       if (activeCard[0] !== "C053" && !hand.some(card => card[0] === activeCard[0])) throw new Error("你的手牌裡沒有這張卡。");
       const nextHand = activeCard[0] === "C053" ? hand : hand.filter(card => card[0] !== activeCard[0]);
-      tx.update(playerRef(), { hand: nextHand, playedCard: activeCard, customText, lastActiveAt: serverTimestamp() });
+      tx.update(playerRef(), { hand: handToDocs(nextHand), playedCard: cardToDoc(activeCard), customText, lastActiveAt: serverTimestamp() });
       tx.update(roomRef(), { updatedAt: serverTimestamp() });
     });
     closeCardModal();
@@ -424,14 +449,14 @@ function renderVoteArea(state, me, mode) {
   const sorted = players.sort((a, b) => mode === "ROUND_RESULT" ? b.votes - a.votes || b.score - a.score : b.score - a.score);
   byId("voteArea").innerHTML = sorted.map(p => {
     const isMe = p.name === myName;
-    const card = p.playedCard;
+    const card = cardFromDoc(p.playedCard);
     const voteButton = mode === "VOTING" && !me.votedFor && !isMe && card
       ? `<button class="btn ghost vote-btn" type="button" data-target="${escapeHtml(p.name)}"><span class="material-symbols-outlined">thumb_up</span>投票</button>`
       : "";
     const played = card
       ? card[0] === "C053"
         ? `<div class="vote-card"><strong>空白絕招：</strong>${escapeHtml(p.customText)}</div>`
-        : `<div class="vote-card"><strong>${escapeHtml(card[2])}</strong><br>${escapeHtml(card[3])}</div>`
+        : `<div class="vote-card"><strong>${escapeHtml(card[2] || "")}</strong><br>${escapeHtml(card[3] || "")}</div>`
       : `<div class="vote-card">尚未出牌</div>`;
     const result = mode !== "VOTING" ? `<span class="stage-pill">本輪 ${p.votes} 票</span>` : "";
     return `<div class="vote-row">
@@ -488,7 +513,7 @@ async function changeState(nextState) {
             playedCard: null,
             customText: "",
             votedFor: "",
-            hand: Array.isArray(p.hand) && p.hand.length ? p.hand : dealHand(),
+            hand: Array.isArray(p.hand) && p.hand.length ? p.hand : handToDocs(dealHand()),
             lastActiveAt: serverTimestamp()
           });
         });
