@@ -66,6 +66,7 @@ let currentHand = [];
 let activeCard = null;
 let unsubscribeRoom = null;
 let unsubscribePlayers = null;
+let lastBroadcastId = "";
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -313,12 +314,28 @@ function renderState(state) {
   byId("headerAvatar").className = `avatar-icon ${avatar.color}`;
   byId("headerAvatar").innerHTML = `<span class="material-symbols-outlined">${avatar.icon}</span>`;
   byId("myBadge").textContent = (me.isLeader ? "組長 " : "玩家 ") + me.name + "｜你";
-  byId("uiMessage").textContent = state.leaderMessage;
+  renderAnnouncement(state);
   byId("syncMeta").textContent = `組員 ${state.players.length} 位｜${new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
   renderScenario(state);
   renderPlayers(state, me);
   renderLeaderPanel(state);
   renderAction(state, me);
+}
+
+function renderAnnouncement(state) {
+  const message = state.leaderMessage || "請依照組長指示進行。";
+  const bar = byId("announcementBar");
+  const incomingId = state.broadcastId || "";
+  byId("uiMessage").textContent = message;
+  if (incomingId && incomingId !== lastBroadcastId) {
+    lastBroadcastId = incomingId;
+    byId("broadcastText").textContent = message;
+    byId("broadcastModal").classList.remove("hidden");
+    bar.classList.remove("broadcast-flash");
+    void bar.offsetWidth;
+    bar.classList.add("broadcast-flash");
+    window.setTimeout(() => bar.classList.remove("broadcast-flash"), 1800);
+  }
 }
 
 function renderScenario(state) {
@@ -517,13 +534,13 @@ async function changeState(nextState) {
         patch.scenarioIdx = pick.index;
         patch.scenarioHistory = pick.history;
         patch.leaderMessage = `第 ${patch.roundCount} 輪開始。請先讀情境，再選一張最合適的策略卡。`;
+        patch.broadcastId = "";
         playerSnaps.docs.forEach(playerDoc => {
-          const p = playerDoc.data();
           tx.update(doc(db, "rooms", myRoom, "players", playerDoc.id), {
             playedCard: null,
             customText: "",
             votedFor: "",
-            hand: Array.isArray(p.hand) && p.hand.length ? p.hand : handToDocs(dealHand()),
+            hand: handToDocs(dealHand()),
             lastActiveAt: serverTimestamp()
           });
         });
@@ -549,7 +566,12 @@ async function sendBroadcast() {
   if (!message) return toast("請先輸入提醒文字。", "error");
   showLoading("廣播發送中...");
   try {
-    await updateDoc(roomRef(), { leaderMessage: message, updatedAt: serverTimestamp() });
+    await updateDoc(roomRef(), {
+      leaderMessage: message,
+      broadcastId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      broadcastAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
     byId("broadcastInput").value = "";
   } catch (error) {
     toast(error.message, "error");
@@ -663,6 +685,7 @@ function bindEvents() {
   byId("refreshBtn").addEventListener("click", refreshState);
   byId("leaveBtn").addEventListener("click", leaveGame);
   byId("broadcastBtn").addEventListener("click", sendBroadcast);
+  byId("closeBroadcastBtn").addEventListener("click", () => byId("broadcastModal").classList.add("hidden"));
   byId("adminLoginBtn").addEventListener("click", adminLogin);
   byId("adminLogoutBtn").addEventListener("click", adminLogout);
   byId("loadAdminBtn").addEventListener("click", loadAdminData);
