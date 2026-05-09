@@ -832,7 +832,10 @@ function bindEvents() {
   byId("closeModalBtn").addEventListener("click", closeCardModal);
   byId("cancelCardBtn").addEventListener("click", closeCardModal);
   byId("playCardBtn").addEventListener("click", playActiveCard);
-  document.querySelectorAll("[data-state]").forEach(btn => btn.addEventListener("click", () => changeState(btn.dataset.state)));
+  document.querySelectorAll("[data-state]").forEach(btn => btn.addEventListener("click", () => {
+    if (btn.dataset.state === "GAMEOVER" && !confirm("確定要結束遊戲嗎？結束後全組會進入遊戲結束畫面。")) return;
+    changeState(btn.dataset.state);
+  }));
 }
 
 renderAvatarPicker();
