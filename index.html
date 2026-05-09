@@ -97,6 +97,7 @@
             <button id="btnStartRound" class="btn mint full" type="button" data-state="PLAYING"><span class="material-symbols-outlined">play_arrow</span>開始新任務</button>
             <button id="btnVoting" class="btn amber full hidden" type="button" data-state="VOTING"><span class="material-symbols-outlined">record_voice_over</span>進入發表投票</button>
             <button id="btnResult" class="btn primary full hidden" type="button" data-state="ROUND_RESULT"><span class="material-symbols-outlined">military_tech</span>公布本輪結果</button>
+            <button id="btnToggleTimer" class="btn ghost full hidden" type="button"><span class="material-symbols-outlined">pause_circle</span>暫停倒數討論</button>
             <button id="btnGameOver" class="btn coral full" type="button" data-state="GAMEOVER"><span class="material-symbols-outlined">flag</span>結束遊戲</button>
           </div>
           <div class="broadcast-row">
@@ -120,6 +121,11 @@
               <p id="actionHint">加入房間後，請等組長發布第一個任務。</p>
             </div>
             <div id="myBadge" class="stage-pill">玩家</div>
+          </div>
+          <div id="timerPanel" class="timer-panel hidden">
+            <span class="material-symbols-outlined">timer</span>
+            <strong id="timerText">0:00</strong>
+            <p id="timerHint">請依照組長指示進行。</p>
           </div>
           <div id="handWrapper" class="hidden"><div id="handArea" class="hand-grid"></div></div>
           <div id="voteWrapper" class="hidden"><div id="voteArea" class="vote-area"></div></div>

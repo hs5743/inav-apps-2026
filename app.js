@@ -37,6 +37,9 @@ const ADMIN_EMAILS = ["hs5743@gapp.hcc.edu.tw"];
 const SCENARIOS = window.SCENARIOS || [];
 const STRATEGIES = window.STRATEGIES || [];
 const byId = id => document.getElementById(id);
+const MAX_PLAYERS = 8;
+const PLAY_SECONDS = 90;
+const VOTE_SECONDS = 60;
 
 const avatars = [
   { key: "avatar-1", image: "assets/avatars/avatar-1.webp", label: "晶晶怪", trait: "指南針" },
@@ -67,6 +70,7 @@ let activeCard = null;
 let unsubscribeRoom = null;
 let unsubscribePlayers = null;
 let lastBroadcastId = "";
+let lastFullPlayersKey = "";
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -204,11 +208,36 @@ function buildState(roomData, players) {
     roundCount: Number(roomData.roundCount) || 0,
     leaderMessage: roomData.leaderMessage || "歡迎來到人際導航員，請等待組員加入。",
     scenario: Number.isInteger(roomData.scenarioIdx) && roomData.scenarioIdx >= 0 ? SCENARIOS[roomData.scenarioIdx] : null,
-    playerCount: players.length,
+    playerCount: Number(roomData.playerCount) || players.length,
+    maxPlayers: Number(roomData.maxPlayers) || MAX_PLAYERS,
+    timerEndsAtMs: Number(roomData.timerEndsAtMs) || 0,
+    timerPaused: Boolean(roomData.timerPaused),
+    timerRemainingMs: Number(roomData.timerRemainingMs) || 0,
     players,
     updatedAt: roomData.updatedAt,
     serverTime: new Date().toISOString()
   };
+}
+
+function timerPatch(seconds) {
+  return {
+    timerEndsAtMs: Date.now() + seconds * 1000,
+    timerRemainingMs: seconds * 1000,
+    timerPaused: false
+  };
+}
+
+function timerRemaining(state) {
+  if (!state || !["PLAYING", "VOTING"].includes(state.roundState)) return 0;
+  if (state.timerPaused) return Math.max(0, state.timerRemainingMs || 0);
+  return Math.max(0, (state.timerEndsAtMs || 0) - Date.now());
+}
+
+function formatTimer(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = String(total % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
 }
 
 async function login(isLeader) {
@@ -218,11 +247,16 @@ async function login(isLeader) {
   if (!myName || !myRoom) return toast("請輸入姓名與房間代碼。", "error");
   showLoading("連線建立中...");
   try {
+    const [prePlayerSnap, prePlayersSnap] = await Promise.all([getDoc(playerRef()), getDocs(playersRef())]);
+    if (!prePlayerSnap.exists() && prePlayersSnap.size >= MAX_PLAYERS) {
+      throw new Error(`這個房間已滿，最多 ${MAX_PLAYERS} 人。請建立或加入另一組。`);
+    }
     await runTransaction(db, async tx => {
       const rRef = roomRef();
       const pRef = playerRef();
       const roomSnap = await tx.get(rRef);
       const playerSnap = await tx.get(pRef);
+      const isNewPlayer = !playerSnap.exists();
       if (!roomSnap.exists()) {
         if (!amILeader) throw new Error("房間尚未建立，請確認房間代碼或請組長先建立。");
         tx.set(rRef, {
@@ -232,9 +266,19 @@ async function login(isLeader) {
           roundCount: 0,
           leaderMessage: "歡迎來到人際導航員，請等待組員加入。",
           scenarioHistory: [],
+          maxPlayers: MAX_PLAYERS,
+          timerEndsAtMs: 0,
+          timerRemainingMs: 0,
+          timerPaused: false,
+          playerCount: isNewPlayer ? 1 : 0,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
+      } else if (isNewPlayer) {
+        const count = Number(roomSnap.data().playerCount);
+        if (Number.isFinite(count) && count >= MAX_PLAYERS) {
+          throw new Error(`這個房間已滿，最多 ${MAX_PLAYERS} 人。請建立或加入另一組。`);
+        }
       }
       const base = playerSnap.exists() ? playerSnap.data() : {};
       tx.set(pRef, {
@@ -249,7 +293,13 @@ async function login(isLeader) {
         joinedAt: base.joinedAt || serverTimestamp(),
         lastActiveAt: serverTimestamp()
       }, { merge: true });
-      tx.update(rRef, { updatedAt: serverTimestamp() });
+      if (roomSnap.exists()) {
+        tx.update(rRef, {
+          maxPlayers: MAX_PLAYERS,
+          updatedAt: serverTimestamp(),
+          ...(isNewPlayer ? { playerCount: increment(1) } : {})
+        });
+      }
     });
     screen("gameScreen");
     byId("leaderPanel").classList.toggle("hidden", !amILeader);
@@ -266,10 +316,22 @@ function subscribeRoom() {
   if (unsubscribePlayers) unsubscribePlayers();
   let roomData = null;
   let players = [];
+  lastFullPlayersKey = "";
   const publish = () => {
     if (!roomData) return;
     const state = buildState(roomData, players);
     renderState(state);
+  };
+  const loadFullPlayersOnce = async key => {
+    if (lastFullPlayersKey === key) return;
+    lastFullPlayersKey = key;
+    try {
+      const snap = await getDocs(playersRef());
+      players = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(sortPlayers);
+      publish();
+    } catch (error) {
+      toast(error.message, "error");
+    }
   };
   unsubscribeRoom = onSnapshot(roomRef(), snap => {
     if (!snap.exists()) {
@@ -278,12 +340,28 @@ function subscribeRoom() {
       return;
     }
     roomData = snap.data();
+    if (!amILeader && !["VOTING", "ROUND_RESULT", "GAMEOVER"].includes(roomData.roundState || "")) {
+      players = players.filter(p => p.name === myName);
+      lastFullPlayersKey = "";
+    }
+    publish();
+    if (!amILeader && ["VOTING", "ROUND_RESULT", "GAMEOVER"].includes(roomData.roundState || "")) {
+      loadFullPlayersOnce(`${roomData.roundCount || 0}:${roomData.roundState}`);
+    }
+  }, err => toast(err.message, "error"));
+  unsubscribePlayers = onSnapshot(amILeader ? playersRef() : playerRef(), snap => {
+    if (amILeader) {
+      players = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(sortPlayers);
+    } else if (snap.exists()) {
+      const me = { id: snap.id, ...snap.data() };
+      players = [me, ...players.filter(p => p.name !== myName)].sort(sortPlayers);
+    }
     publish();
   }, err => toast(err.message, "error"));
-  unsubscribePlayers = onSnapshot(playersRef(), snap => {
-    players = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => Number(b.isLeader) - Number(a.isLeader) || a.name.localeCompare(b.name, "zh-Hant"));
-    publish();
-  }, err => toast(err.message, "error"));
+}
+
+function sortPlayers(a, b) {
+  return Number(b.isLeader) - Number(a.isLeader) || a.name.localeCompare(b.name, "zh-Hant");
 }
 
 async function refreshState() {
@@ -316,11 +394,28 @@ function renderState(state) {
   byId("headerAvatar").innerHTML = `<img src="${escapeHtml(avatar.image)}" alt="${escapeHtml(avatar.label)}">`;
   byId("myBadge").textContent = (me.isLeader ? "組長 " : "玩家 ") + me.name + "｜你";
   renderAnnouncement(state);
-  byId("syncMeta").textContent = `組員 ${state.players.length} 位｜${new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+  byId("syncMeta").textContent = `組員 ${state.playerCount} / ${state.maxPlayers} 位｜${new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+  renderTimer(state);
   renderScenario(state);
   renderPlayers(state, me);
   renderLeaderPanel(state);
   renderAction(state, me);
+}
+
+function renderTimer(state) {
+  const panel = byId("timerPanel");
+  const active = ["PLAYING", "VOTING"].includes(state.roundState);
+  panel.classList.toggle("hidden", !active);
+  if (!active) return;
+  const ms = timerRemaining(state);
+  byId("timerText").textContent = formatTimer(ms);
+  byId("timerHint").textContent = state.timerPaused
+    ? "組長暫停倒數，現在是小組討論時間。"
+    : state.roundState === "PLAYING"
+      ? "出牌倒數中。時間到後，請等組長安排下一步。"
+      : "投票倒數中。時間到後，請等組長公布結果。";
+  panel.classList.toggle("paused", state.timerPaused);
+  panel.classList.toggle("urgent", !state.timerPaused && ms <= 15000);
 }
 
 function renderAnnouncement(state) {
@@ -354,6 +449,15 @@ function renderScenario(state) {
 }
 
 function renderPlayers(state, me) {
+  if (!amILeader && state.players.length <= 1) {
+    byId("playersList").innerHTML = `<div class="player-row me">
+      ${avatarHtml(me.avatarKey, true)}
+      <div class="grow"><strong>${escapeHtml(me.name)}｜你</strong><small>總分 ${Number(me.score) || 0}</small></div>
+      <span class="stage-pill">本組 ${state.playerCount} / ${state.maxPlayers} 人</span>
+    </div>
+    <div class="progress-note">組長會掌握全組進度；你只需要依照倒數完成出牌與投票。</div>`;
+    return;
+  }
   byId("playersList").innerHTML = state.players.map(p => {
     const done = state.roundState === "PLAYING" ? Boolean(p.playedCard) : state.roundState === "VOTING" ? Boolean(p.votedFor) : true;
     return `<div class="player-row ${p.name === me.name ? "me" : ""}">
@@ -371,6 +475,10 @@ function renderLeaderPanel(state) {
   byId("btnStartRound").classList.toggle("hidden", !(stage === "LOBBY" || stage === "ROUND_RESULT"));
   byId("btnVoting").classList.toggle("hidden", stage !== "PLAYING");
   byId("btnResult").classList.toggle("hidden", stage !== "VOTING");
+  byId("btnToggleTimer").classList.toggle("hidden", !["PLAYING", "VOTING"].includes(stage));
+  byId("btnToggleTimer").innerHTML = state.timerPaused
+    ? `<span class="material-symbols-outlined">play_circle</span>繼續倒數`
+    : `<span class="material-symbols-outlined">pause_circle</span>暫停倒數討論`;
   byId("btnGameOver").classList.toggle("hidden", stage === "GAMEOVER");
   byId("leaderProgress").innerHTML = state.players.map(p => {
     const text = stage === "PLAYING" ? (p.playedCard ? "已出牌" : "思考中") : stage === "VOTING" ? (p.votedFor ? "已投票" : "待投票") : "待命";
@@ -461,7 +569,6 @@ async function playActiveCard() {
       if (activeCard[0] !== "C053" && !hand.some(card => card[0] === activeCard[0])) throw new Error("你的手牌裡沒有這張卡。");
       const nextHand = activeCard[0] === "C053" ? hand : hand.filter(card => card[0] !== activeCard[0]);
       tx.update(playerRef(), { hand: handToDocs(nextHand), playedCard: cardToDoc(activeCard), customText, lastActiveAt: serverTimestamp() });
-      tx.update(roomRef(), { updatedAt: serverTimestamp() });
     });
     closeCardModal();
     toast("已送出策略卡。");
@@ -473,6 +580,10 @@ async function playActiveCard() {
 }
 
 function renderVoteArea(state, me, mode) {
+  if (mode === "VOTING" && !amILeader && state.players.length <= 1) {
+    byId("voteArea").innerHTML = `<div class="vote-row"><div class="vote-card">正在載入組員出牌資料，請稍候。</div></div>`;
+    return;
+  }
   const players = state.players.map(p => ({ ...p, votes: state.players.filter(v => v.votedFor === p.name).length }));
   const sorted = players.sort((a, b) => mode === "ROUND_RESULT" ? b.votes - a.votes || b.score - a.score : b.score - a.score);
   byId("voteArea").innerHTML = sorted.map(p => {
@@ -509,7 +620,6 @@ async function submitVote(targetName) {
       if (!targetSnap.data().playedCard) throw new Error("這位同學尚未出牌。");
       tx.update(playerRef(), { votedFor: targetName, lastActiveAt: serverTimestamp() });
       tx.update(playerRef(myRoom, targetName), { score: increment(1) });
-      tx.update(roomRef(), { updatedAt: serverTimestamp() });
     });
     toast("投票完成。");
   } catch (error) {
@@ -536,6 +646,7 @@ async function changeState(nextState) {
         patch.scenarioHistory = pick.history;
         patch.leaderMessage = `第 ${patch.roundCount} 輪開始。請先讀情境，再選一張最合適的策略卡。`;
         patch.broadcastId = "";
+        Object.assign(patch, timerPatch(PLAY_SECONDS));
         playerSnaps.docs.forEach(playerDoc => {
           tx.update(doc(db, "rooms", myRoom, "players", playerDoc.id), {
             playedCard: null,
@@ -547,11 +658,18 @@ async function changeState(nextState) {
         });
       } else if (nextState === "VOTING") {
         patch.leaderMessage = "請輪流說明策略理由，再投給最安全、尊重、有效的對策。";
+        Object.assign(patch, timerPatch(VOTE_SECONDS));
       } else if (nextState === "ROUND_RESULT") {
         patch.leaderMessage = "本輪結果公布。請討論：哪些策略最能照顧自己，也尊重別人？";
+        patch.timerEndsAtMs = 0;
+        patch.timerRemainingMs = 0;
+        patch.timerPaused = false;
       } else if (nextState === "GAMEOVER") {
         patch.status = "ENDED";
         patch.leaderMessage = "遊戲結束。請回顧今天最想帶走的一個人際策略。";
+        patch.timerEndsAtMs = 0;
+        patch.timerRemainingMs = 0;
+        patch.timerPaused = false;
       }
       tx.update(roomRef(), patch);
     });
@@ -559,6 +677,26 @@ async function changeState(nextState) {
     toast(error.message, "error");
   } finally {
     hideLoading();
+  }
+}
+
+async function toggleTimer() {
+  if (!amILeader || !currentState || !["PLAYING", "VOTING"].includes(currentState.roundState)) return;
+  const patch = currentState.timerPaused
+    ? {
+        timerEndsAtMs: Date.now() + Math.max(0, currentState.timerRemainingMs || 0),
+        timerPaused: false,
+        updatedAt: serverTimestamp()
+      }
+    : {
+        timerRemainingMs: timerRemaining(currentState),
+        timerPaused: true,
+        updatedAt: serverTimestamp()
+      };
+  try {
+    await updateDoc(roomRef(), patch);
+  } catch (error) {
+    toast(error.message, "error");
   }
 }
 
@@ -686,6 +824,7 @@ function bindEvents() {
   byId("refreshBtn").addEventListener("click", refreshState);
   byId("leaveBtn").addEventListener("click", leaveGame);
   byId("broadcastBtn").addEventListener("click", sendBroadcast);
+  byId("btnToggleTimer").addEventListener("click", toggleTimer);
   byId("closeBroadcastBtn").addEventListener("click", () => byId("broadcastModal").classList.add("hidden"));
   byId("adminLoginBtn").addEventListener("click", adminLogin);
   byId("adminLogoutBtn").addEventListener("click", adminLogout);
@@ -699,3 +838,6 @@ function bindEvents() {
 renderAvatarPicker();
 bindEvents();
 onAuthStateChanged(auth, renderAdminAuth);
+window.setInterval(() => {
+  if (currentState) renderTimer(currentState);
+}, 1000);
