@@ -39,14 +39,14 @@ const STRATEGIES = window.STRATEGIES || [];
 const byId = id => document.getElementById(id);
 
 const avatars = [
-  { key: "avatar-1", icon: "explore", color: "bg-ocean", label: "指南針" },
-  { key: "avatar-2", icon: "psychology", color: "bg-coral", label: "覺察" },
-  { key: "avatar-3", icon: "forum", color: "bg-mint", label: "溝通" },
-  { key: "avatar-4", icon: "route", color: "bg-amber", label: "路線" },
-  { key: "avatar-5", icon: "shield", color: "bg-violet", label: "守護" },
-  { key: "avatar-6", icon: "lightbulb", color: "bg-ocean", label: "點子" },
-  { key: "avatar-7", icon: "diversity_3", color: "bg-mint", label: "合作" },
-  { key: "avatar-8", icon: "auto_awesome", color: "bg-violet", label: "絕招" }
+  { key: "avatar-1", image: "assets/avatars/avatar-1.webp", label: "晶晶怪", trait: "指南針" },
+  { key: "avatar-2", image: "assets/avatars/avatar-2.webp", label: "暖心怪", trait: "覺察" },
+  { key: "avatar-3", image: "assets/avatars/avatar-3.webp", label: "勇氣怪", trait: "溝通" },
+  { key: "avatar-4", image: "assets/avatars/avatar-4.webp", label: "路線怪", trait: "路線" },
+  { key: "avatar-5", image: "assets/avatars/avatar-5.webp", label: "守護怪", trait: "守護" },
+  { key: "avatar-6", image: "assets/avatars/avatar-6.webp", label: "點子怪", trait: "點子" },
+  { key: "avatar-7", image: "assets/avatars/avatar-7.webp", label: "合作怪", trait: "合作" },
+  { key: "avatar-8", image: "assets/avatars/avatar-8.webp", label: "星星怪", trait: "絕招" }
 ];
 
 const categoryStyle = {
@@ -122,14 +122,15 @@ function avatarMeta(key) {
 
 function avatarHtml(key, small = false) {
   const avatar = avatarMeta(key);
-  return `<div class="avatar-dot ${small ? "small" : ""} ${avatar.color}"><span class="material-symbols-outlined">${avatar.icon}</span></div>`;
+  return `<img class="avatar-img ${small ? "small" : ""}" src="${escapeHtml(avatar.image)}" alt="${escapeHtml(avatar.label)}">`;
 }
 
 function renderAvatarPicker() {
   byId("avatarPicker").innerHTML = avatars.map(a => `
     <button type="button" class="avatar-choice ${a.key === selectedAvatarKey ? "selected" : ""}" data-avatar="${a.key}" title="${escapeHtml(a.label)}">
-      <div class="avatar-dot ${a.color}" style="margin:0 auto;"><span class="material-symbols-outlined">${a.icon}</span></div>
-      <div class="small-label" style="margin:6px 0 0;">${escapeHtml(a.label)}</div>
+      <img class="avatar-img picker" src="${escapeHtml(a.image)}" alt="${escapeHtml(a.label)}">
+      <div class="avatar-name">${escapeHtml(a.label)}</div>
+      <div class="avatar-trait">${escapeHtml(a.trait)}</div>
     </button>
   `).join("");
   document.querySelectorAll("[data-avatar]").forEach(btn => btn.addEventListener("click", () => {
@@ -311,8 +312,8 @@ function renderState(state) {
   byId("uiRound").textContent = state.roundCount;
   byId("uiScore").textContent = me.score || 0;
   byId("uiIdentity").textContent = (me.isLeader ? "組長 " : "玩家 ") + me.name;
-  byId("headerAvatar").className = `avatar-icon ${avatar.color}`;
-  byId("headerAvatar").innerHTML = `<span class="material-symbols-outlined">${avatar.icon}</span>`;
+  byId("headerAvatar").className = "avatar-icon";
+  byId("headerAvatar").innerHTML = `<img src="${escapeHtml(avatar.image)}" alt="${escapeHtml(avatar.label)}">`;
   byId("myBadge").textContent = (me.isLeader ? "組長 " : "玩家 ") + me.name + "｜你";
   renderAnnouncement(state);
   byId("syncMeta").textContent = `組員 ${state.players.length} 位｜${new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
