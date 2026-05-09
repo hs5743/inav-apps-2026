@@ -47,21 +47,47 @@ button, input, textarea { font: inherit; }
 .feature-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin: 20px 0 18px;
+  gap: 12px;
+  margin: 14px 0 0;
   max-width: 760px;
 }
 .feature-chip {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 5px 8px;
-  min-height: 72px;
-  padding: 11px 12px;
+  min-height: 78px;
+  padding: 12px 13px;
   border-radius: 16px;
   background: rgba(255,255,255,.78);
   border: 1px solid rgba(16,32,51,.12);
   box-shadow: 0 10px 24px rgba(16,32,51,.08);
+  overflow: hidden;
+}
+.feature-chip::after {
+  content: "";
+  position: absolute;
+  inset: auto 12px 8px 56px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(40,183,216,.85), rgba(242,180,59,.85));
+  opacity: .55;
+}
+.feature-chip:nth-child(2) { transform: translateY(8px); }
+.feature-chip:nth-child(3) { transform: translateY(-4px); }
+.feature-chip:nth-child(4) { transform: translateY(6px); }
+.feature-chip:nth-child(2) .material-symbols-outlined { background: linear-gradient(135deg, rgba(242,180,59,.2), rgba(239,101,88,.16)); color: #b76f09; }
+.feature-chip:nth-child(3) .material-symbols-outlined { background: linear-gradient(135deg, rgba(116,103,201,.18), rgba(40,183,216,.14)); color: var(--violet); }
+.feature-chip:nth-child(4) .material-symbols-outlined { background: linear-gradient(135deg, rgba(34,169,143,.2), rgba(126,203,82,.18)); color: var(--mint); }
+.feature-chip:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(16,32,51,.12);
+}
+.feature-chip:nth-child(2):hover,
+.feature-chip:nth-child(3):hover,
+.feature-chip:nth-child(4):hover {
+  transform: translateY(-3px);
 }
 .feature-chip .material-symbols-outlined {
   grid-row: span 2;
@@ -79,7 +105,6 @@ button, input, textarea { font: inherit; }
   color: var(--ink);
   font-size: 14px;
   line-height: 1.25;
-  white-space: nowrap;
 }
 .feature-chip small {
   color: var(--muted);
@@ -477,6 +502,9 @@ th { color: var(--muted); font-size: 13px; }
   .hero p { font-size: 17px; }
   .feature-strip { grid-template-columns: 1fr 1fr; gap: 8px; }
   .feature-chip { min-height: 64px; padding: 9px; }
+  .feature-chip:nth-child(n) { transform: none; }
+  .feature-chip:nth-child(n):hover { transform: translateY(-2px); }
+  .feature-chip::after { inset: auto 10px 6px 50px; }
   .feature-chip strong { white-space: normal; font-size: 13px; }
   .map-hero { min-height: 210px; border-radius: 18px; }
 }
