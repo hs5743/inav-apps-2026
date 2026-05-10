@@ -71,6 +71,7 @@ let unsubscribeRoom = null;
 let unsubscribePlayers = null;
 let lastBroadcastId = "";
 let lastFullPlayersKey = "";
+let adminRoomRows = [];
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -238,6 +239,98 @@ function formatTimer(ms) {
   const minutes = Math.floor(total / 60);
   const seconds = String(total % 60).padStart(2, "0");
   return `${minutes}:${seconds}`;
+}
+
+function scenarioToDoc(scenario) {
+  if (!scenario) return null;
+  return {
+    id: scenario[0] || "",
+    type: scenario[1] || "",
+    text: scenario[2] || "",
+    feeling: scenario[3] || ""
+  };
+}
+
+function scenarioFromDoc(scenario) {
+  if (!scenario) return null;
+  if (Array.isArray(scenario)) return scenarioToDoc(scenario);
+  return {
+    id: scenario.id || "",
+    type: scenario.type || "",
+    text: scenario.text || "",
+    feeling: scenario.feeling || ""
+  };
+}
+
+function countBy(items, picker) {
+  return items.reduce((acc, item) => {
+    const key = picker(item);
+    if (key) acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function valuesOfCounts(counts) {
+  return Object.entries(counts || {})
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "zh-Hant"));
+}
+
+function makeRoundLog(room, players) {
+  const scenario = scenarioToDoc(SCENARIOS[room.scenarioIdx]);
+  const played = players
+    .map(p => ({ player: p.name || p.id || "", card: cardFromDoc(p.playedCard), customText: p.customText || "" }))
+    .filter(item => item.card);
+  const votesByTarget = countBy(players, p => p.votedFor || "");
+  const categoryCounts = countBy(played, item => item.card[1] || "未分類");
+  const strategyCounts = countBy(played, item => item.card[2] || item.card[0] || "未命名策略");
+  const strategyMap = {};
+  played.forEach(item => {
+    const key = item.card[0] || item.card[2] || "custom";
+    if (!strategyMap[key]) {
+      strategyMap[key] = {
+        cardId: item.card[0] || "",
+        category: item.card[1] || "",
+        title: item.card[2] || "",
+        selectedCount: 0,
+        votes: 0,
+        customText: item.card[0] === "C053" ? item.customText : ""
+      };
+    }
+    strategyMap[key].selectedCount += 1;
+    strategyMap[key].votes += votesByTarget[item.player] || 0;
+  });
+  const strategyRows = Object.values(strategyMap).sort((a, b) => b.votes - a.votes || b.selectedCount - a.selectedCount || a.title.localeCompare(b.title, "zh-Hant"));
+  const topStrategies = strategyRows.filter(row => row.votes === (strategyRows[0]?.votes || 0) && row.votes > 0);
+  return {
+    round: Number(room.roundCount) || 0,
+    scenario,
+    playerCount: players.length,
+    playedCount: played.length,
+    voteCount: players.filter(p => p.votedFor).length,
+    categoryCounts,
+    strategyCounts,
+    topStrategies,
+    strategies: strategyRows,
+    savedAtMs: Date.now()
+  };
+}
+
+function escapeCsv(value) {
+  const text = String(value ?? "");
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadText(filename, text, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 async function login(isLeader) {
@@ -633,7 +726,7 @@ async function changeState(nextState) {
   if (!amILeader) return toast("只有組長可以操作。", "error");
   showLoading("階段切換中...");
   try {
-    const playerSnaps = nextState === "PLAYING" ? await getDocs(playersRef()) : null;
+    const playerSnaps = ["PLAYING", "ROUND_RESULT"].includes(nextState) ? await getDocs(playersRef()) : null;
     await runTransaction(db, async tx => {
       const rSnap = await tx.get(roomRef());
       if (!rSnap.exists()) throw new Error("找不到房間。");
@@ -664,6 +757,12 @@ async function changeState(nextState) {
         patch.timerEndsAtMs = 0;
         patch.timerRemainingMs = 0;
         patch.timerPaused = false;
+        const players = playerSnaps.docs.map(d => ({ id: d.id, ...d.data() }));
+        const log = makeRoundLog(room, players);
+        const logs = Array.isArray(room.roundLogs) ? room.roundLogs : [];
+        patch.roundLogs = [...logs.filter(item => Number(item.round) !== log.round), log]
+          .sort((a, b) => Number(a.round) - Number(b.round))
+          .slice(-20);
       } else if (nextState === "GAMEOVER") {
         patch.status = "ENDED";
         patch.leaderMessage = "遊戲結束。請回顧今天最想帶走的一個人際策略。";
@@ -744,29 +843,137 @@ async function loadAdminData() {
     for (const roomDoc of roomsSnap.docs) {
       const playersSnap = await getDocs(playersRef(roomDoc.id));
       const room = roomDoc.data();
+      const roundLogs = Array.isArray(room.roundLogs) ? room.roundLogs : [];
       rows.push({
         roomID: roomDoc.id,
         state: room.roundState || "LOBBY",
         roundCount: room.roundCount || 0,
         players: playersSnap.size,
-        updatedAt: room.updatedAt && room.updatedAt.toDate ? room.updatedAt.toDate() : null
+        updatedAt: room.updatedAt && room.updatedAt.toDate ? room.updatedAt.toDate() : null,
+        roundLogs,
+        playerNames: playersSnap.docs.map(d => d.data().name || d.id)
       });
     }
     rows.sort((a, b) => (b.updatedAt?.getTime?.() || 0) - (a.updatedAt?.getTime?.() || 0));
+    adminRoomRows = rows;
+    renderAdminSummary(rows);
     byId("adminRows").innerHTML = rows.map(r => `<tr>
       <td>${escapeHtml(r.roomID)}</td>
       <td>${escapeHtml(r.state)}</td>
       <td>${Number(r.roundCount) || 0}</td>
       <td>${Number(r.players) || 0}</td>
       <td>${r.updatedAt ? r.updatedAt.toLocaleString("zh-TW") : ""}</td>
+      <td><div class="admin-actions">
+        <button class="btn ghost admin-view" type="button" data-room="${escapeHtml(r.roomID)}"><span class="material-symbols-outlined">visibility</span>摘要</button>
+        <button class="btn ghost admin-csv" type="button" data-room="${escapeHtml(r.roomID)}"><span class="material-symbols-outlined">download</span>CSV</button>
+        <button class="btn ghost admin-html" type="button" data-room="${escapeHtml(r.roomID)}"><span class="material-symbols-outlined">article</span>HTML</button>
+      </div></td>
       <td><button class="btn coral delete-room" type="button" data-room="${escapeHtml(r.roomID)}"><span class="material-symbols-outlined">delete</span>解散</button></td>
-    </tr>`).join("") || `<tr><td colspan="6">目前沒有房間。</td></tr>`;
+    </tr>`).join("") || `<tr><td colspan="7">目前沒有房間。</td></tr>`;
+    document.querySelectorAll(".admin-view").forEach(btn => btn.addEventListener("click", () => renderRoomDetail(findAdminRoom(btn.dataset.room))));
+    document.querySelectorAll(".admin-csv").forEach(btn => btn.addEventListener("click", () => exportRoomCsv(findAdminRoom(btn.dataset.room))));
+    document.querySelectorAll(".admin-html").forEach(btn => btn.addEventListener("click", () => exportRoomHtml(findAdminRoom(btn.dataset.room))));
     document.querySelectorAll(".delete-room").forEach(btn => btn.addEventListener("click", () => deleteRoom(btn.dataset.room)));
   } catch (error) {
     toast(error.message, "error");
   } finally {
     hideLoading();
   }
+}
+
+function findAdminRoom(roomID) {
+  return adminRoomRows.find(row => row.roomID === roomID);
+}
+
+function renderAdminSummary(rows) {
+  const totalRooms = rows.length;
+  const totalRounds = rows.reduce((sum, row) => sum + Number(row.roundCount || 0), 0);
+  const totalPlayers = rows.reduce((sum, row) => sum + Number(row.players || 0), 0);
+  const categoryTotals = {};
+  rows.forEach(row => (row.roundLogs || []).forEach(log => {
+    Object.entries(log.categoryCounts || {}).forEach(([category, count]) => {
+      categoryTotals[category] = (categoryTotals[category] || 0) + Number(count || 0);
+    });
+  }));
+  const topCategories = valuesOfCounts(categoryTotals).slice(0, 5);
+  byId("adminSummary").innerHTML = `<div class="summary-cards">
+    <div><span>房間總數</span><strong>${totalRooms}</strong></div>
+    <div><span>平均每房輪數</span><strong>${totalRooms ? (totalRounds / totalRooms).toFixed(1) : "0.0"}</strong></div>
+    <div><span>總參與人次</span><strong>${totalPlayers}</strong></div>
+  </div>
+  <div class="summary-panel">
+    <h3>常用策略類型</h3>
+    ${topCategories.length ? topCategories.map(item => `<span class="stage-pill">${escapeHtml(item.label)} ${item.count}</span>`).join("") : `<p>尚無逐輪摘要，請在新活動公布結果後再查看。</p>`}
+  </div>`;
+}
+
+function renderRoomDetail(room) {
+  if (!room) return;
+  const logs = room.roundLogs || [];
+  const detail = byId("adminRoomDetail");
+  detail.classList.remove("hidden");
+  detail.innerHTML = `<div class="section-head">
+    <h2>房間 ${escapeHtml(room.roomID)} 摘要</h2>
+    <div class="admin-actions">
+      <button class="btn ghost" type="button" id="detailCsvBtn"><span class="material-symbols-outlined">download</span>CSV</button>
+      <button class="btn ghost" type="button" id="detailHtmlBtn"><span class="material-symbols-outlined">article</span>HTML</button>
+    </div>
+  </div>
+  ${logs.length ? logs.map(renderRoundLog).join("") : `<div class="admin-note">這個房間尚無逐輪摘要。舊房間無法回推已清除的每輪紀錄。</div>`}`;
+  byId("detailCsvBtn").addEventListener("click", () => exportRoomCsv(room));
+  byId("detailHtmlBtn").addEventListener("click", () => exportRoomHtml(room));
+}
+
+function renderRoundLog(log) {
+  const scenario = scenarioFromDoc(log.scenario);
+  const categories = valuesOfCounts(log.categoryCounts);
+  const top = (log.topStrategies || []).map(item => item.title).join("、") || "尚無得票策略";
+  return `<article class="round-log-card">
+    <div class="section-head"><h3>第 ${Number(log.round) || 0} 輪</h3><span class="stage-pill">${escapeHtml(scenario?.type || "未分類")}</span></div>
+    <p><strong>情境：</strong>${escapeHtml(scenario?.text || "未記錄")}</p>
+    <p><strong>參與：</strong>${Number(log.playerCount) || 0} 人，出牌 ${Number(log.playedCount) || 0}，投票 ${Number(log.voteCount) || 0}</p>
+    <p><strong>最高票策略：</strong>${escapeHtml(top)}</p>
+    <div class="summary-tags">${categories.map(item => `<span class="stage-pill">${escapeHtml(item.label)} ${item.count}</span>`).join("") || `<span class="stage-pill">無策略紀錄</span>`}</div>
+  </article>`;
+}
+
+function buildRoomCsv(room) {
+  const rows = [["房間", "輪次", "情境類型", "情境內容", "玩家數", "出牌數", "投票數", "策略類型統計", "最高票策略"]];
+  (room.roundLogs || []).forEach(log => {
+    const scenario = scenarioFromDoc(log.scenario);
+    const categoryText = valuesOfCounts(log.categoryCounts).map(item => `${item.label}:${item.count}`).join(" / ");
+    const topText = (log.topStrategies || []).map(item => `${item.title}(${item.votes}票)`).join(" / ");
+    rows.push([room.roomID, log.round, scenario?.type || "", scenario?.text || "", log.playerCount, log.playedCount, log.voteCount, categoryText, topText]);
+  });
+  if (!room.roundLogs?.length) rows.push([room.roomID, "", "", "尚無逐輪摘要", room.players, "", "", "", ""]);
+  return "\uFEFF" + rows.map(row => row.map(escapeCsv).join(",")).join("\r\n");
+}
+
+function exportRoomCsv(room) {
+  if (!room) return;
+  downloadText(`inav-${room.roomID}-summary.csv`, buildRoomCsv(room), "text/csv;charset=utf-8");
+}
+
+function buildRoomHtml(room) {
+  const logs = room.roundLogs || [];
+  const body = logs.length ? logs.map(log => {
+    const scenario = scenarioFromDoc(log.scenario);
+    const categories = valuesOfCounts(log.categoryCounts).map(item => `<span>${escapeHtml(item.label)} ${item.count}</span>`).join("");
+    const top = (log.topStrategies || []).map(item => `${escapeHtml(item.title)} (${Number(item.votes) || 0} 票)`).join("、") || "尚無得票策略";
+    return `<section><h2>第 ${Number(log.round) || 0} 輪｜${escapeHtml(scenario?.type || "未分類")}</h2>
+      <p><strong>情境：</strong>${escapeHtml(scenario?.text || "未記錄")}</p>
+      <p><strong>參與：</strong>${Number(log.playerCount) || 0} 人，出牌 ${Number(log.playedCount) || 0}，投票 ${Number(log.voteCount) || 0}</p>
+      <p><strong>最高票策略：</strong>${top}</p>
+      <div>${categories || "<span>無策略紀錄</span>"}</div></section>`;
+  }).join("") : `<section><p>這個房間尚無逐輪摘要。舊房間無法回推已清除的每輪紀錄。</p></section>`;
+  return `<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8"><title>人際導航員房間 ${escapeHtml(room.roomID)} 摘要</title>
+    <style>body{font-family:"Noto Sans TC",system-ui,sans-serif;line-height:1.7;color:#102033;padding:28px;background:#f4fbf8}main{max-width:900px;margin:auto;background:white;border-radius:18px;padding:24px;box-shadow:0 16px 38px rgba(16,32,51,.13)}section{border-top:1px solid #d7e2e7;padding:16px 0}span{display:inline-block;margin:4px 6px 4px 0;padding:6px 10px;border-radius:999px;background:#e9f8f4;color:#0f7fa3;font-weight:800}</style>
+    </head><body><main><h1>人際導航員｜房間 ${escapeHtml(room.roomID)} 活動摘要</h1><p>輪數：${Number(room.roundCount) || 0}，人數：${Number(room.players) || 0}</p>${body}</main></body></html>`;
+}
+
+function exportRoomHtml(room) {
+  if (!room) return;
+  downloadText(`inav-${room.roomID}-summary.html`, buildRoomHtml(room), "text/html;charset=utf-8");
 }
 
 async function deleteRoom(room) {

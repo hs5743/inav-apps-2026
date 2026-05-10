@@ -153,9 +153,11 @@
           <button class="btn primary" type="button" id="loadAdminBtn"><span class="material-symbols-outlined">sync</span>重新整理房間</button>
           <button class="btn ghost" type="button" id="adminLogoutBtn"><span class="material-symbols-outlined">logout</span>登出</button>
         </div>
+        <div id="adminSummary" class="admin-summary"></div>
+        <div id="adminRoomDetail" class="admin-room-detail hidden"></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>房間</th><th>階段</th><th>輪次</th><th>人數</th><th>更新</th><th></th></tr></thead>
+            <thead><tr><th>房間</th><th>階段</th><th>輪次</th><th>人數</th><th>更新</th><th>摘要與匯出</th><th></th></tr></thead>
             <tbody id="adminRows"></tbody>
           </table>
         </div>

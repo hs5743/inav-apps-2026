@@ -381,6 +381,31 @@ h1, h2, p { margin-top: 0; }
 .admin-panel { width: min(1040px, 100%); margin: 0 auto; padding: 22px; }
 .admin-note { padding: 12px; border-radius: 12px; background: #fff5df; color: #965b05; font-weight: 900; margin-bottom: 12px; }
 .admin-auth { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+.admin-summary { display: grid; gap: 12px; margin: 14px 0; }
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.summary-cards div, .summary-panel, .admin-room-detail, .round-log-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255,255,255,.84);
+  box-shadow: 0 10px 24px rgba(16,32,51,.07);
+}
+.summary-cards div { padding: 14px; }
+.summary-cards span { display: block; color: var(--muted); font-size: 13px; font-weight: 900; }
+.summary-cards strong { display: block; margin-top: 4px; font-size: 30px; color: var(--ocean); }
+.summary-panel { padding: 14px; }
+.summary-panel h3 { margin: 0 0 10px; }
+.summary-panel p { margin: 0; color: var(--muted); font-weight: 800; }
+.admin-room-detail { padding: 16px; margin: 14px 0; }
+.round-log-card { padding: 14px; margin-top: 12px; }
+.round-log-card h3 { margin: 0; }
+.round-log-card p { margin: 8px 0; color: var(--muted); font-weight: 800; }
+.summary-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.admin-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin-actions .btn { min-height: 34px; border-radius: 10px; padding: 6px 10px; font-size: 13px; }
 .table-wrap { overflow: auto; margin-top: 14px; }
 table { width: 100%; border-collapse: collapse; min-width: 760px; }
 th, td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; font-weight: 800; }
@@ -489,6 +514,7 @@ th { color: var(--muted); font-size: 13px; }
   .hand-grid { grid-template-columns: 1fr 1fr; }
   .map-hero { min-height: 250px; }
   .feature-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: none; }
+  .summary-cards { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .login-screen, .admin-screen { padding: 14px; }
