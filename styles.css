@@ -361,6 +361,21 @@ h1, h2, p { margin-top: 0; }
 .timer-panel.urgent { background: #fff1f2; border-color: rgba(239,101,88,.46); }
 .timer-panel.urgent strong, .timer-panel.urgent .material-symbols-outlined { color: var(--coral); }
 .hand-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.hand-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 160px;
+  padding: 20px;
+  border: 2px dashed rgba(40,183,216,.45);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #eafaff, #fff5df);
+  text-align: center;
+}
+.hand-empty .material-symbols-outlined { color: var(--ocean); font-size: 42px; }
+.hand-empty strong { font-size: 22px; }
+.hand-empty p { margin: 0; color: var(--muted); font-weight: 900; }
 .strategy-card {
   min-height: 178px;
   border-radius: 14px;

@@ -72,6 +72,7 @@ let unsubscribePlayers = null;
 let lastBroadcastId = "";
 let lastFullPlayersKey = "";
 let adminRoomRows = [];
+let repairingHandKey = "";
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -239,6 +240,23 @@ function formatTimer(ms) {
   const minutes = Math.floor(total / 60);
   const seconds = String(total % 60).padStart(2, "0");
   return `${minutes}:${seconds}`;
+}
+
+async function repairMissingHand(state, me) {
+  const key = `${state.roomID}:${state.roundCount}:${me.name}`;
+  if (repairingHandKey === key) return;
+  repairingHandKey = key;
+  try {
+    const hand = dealHand();
+    if (!hand.length) throw new Error("策略卡資料尚未載入，請重新整理後再試。");
+    await updateDoc(playerRef(), {
+      hand: handToDocs(hand),
+      lastActiveAt: serverTimestamp()
+    });
+  } catch (error) {
+    toast(error.message || "補發策略卡失敗，請重新整理。", "error");
+    repairingHandKey = "";
+  }
 }
 
 function scenarioToDoc(scenario) {
@@ -596,6 +614,11 @@ function renderAction(state, me) {
     byId("actionTitle").textContent = "選擇你的策略卡";
     byId("actionHint").textContent = "點擊卡片看詳細說明，並在彈窗中出牌。";
     byId("handWrapper").classList.remove("hidden");
+    if (!currentHand.length) {
+      byId("handArea").innerHTML = `<div class="hand-empty"><span class="material-symbols-outlined">style</span><strong>正在補發策略卡</strong><p>如果畫面沒有自動更新，請按右上角重新整理。</p></div>`;
+      repairMissingHand(state, me);
+      return;
+    }
     renderHand(currentHand);
     return;
   }
