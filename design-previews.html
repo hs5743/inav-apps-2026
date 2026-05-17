@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>人際導航員｜主視覺與配色預覽</title>
+  <style>
+    :root {
+      --ink: #132231;
+      --muted: #64748b;
+      --paper: #f4fbf8;
+      --line: rgba(100, 116, 139, .22);
+      --shadow: 0 18px 48px rgba(19, 34, 49, .12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans TC", system-ui, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(135deg, #f4fbf8, #fffaf2);
+    }
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 36px 0 48px;
+    }
+    header { margin-bottom: 26px; }
+    h1 { margin: 0 0 10px; font-size: clamp(34px, 5vw, 60px); line-height: 1.05; }
+    p { margin: 0; color: var(--muted); font-weight: 800; line-height: 1.7; }
+    h2 { margin: 30px 0 14px; font-size: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+    .card {
+      background: rgba(255, 255, 255, .92);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 14 / 9;
+      object-fit: cover;
+      background: #e8f3ef;
+    }
+    .card div { padding: 14px 16px 16px; }
+    .card h3 { margin: 0 0 6px; font-size: 18px; }
+    .card small { color: var(--muted); font-weight: 800; line-height: 1.55; }
+    .path {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: #edf6f2;
+      color: #176b87;
+      font-size: 12px;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>主視覺與配色預覽</h1>
+      <p>這些是候選圖，不會自動替換正式首頁。請選一張 hero 圖與一張配色方向，下一步再整合進網站。</p>
+    </header>
+
+    <h2>首頁 Hero 圖</h2>
+    <section class="grid">
+      <article class="card">
+        <img src="assets/design-previews/hero-fantasy.webp" alt="奇幻導航感 hero 預覽">
+        <div>
+          <h3>奇幻導航感</h3>
+          <small>可愛角色、發光路線、冒險地圖，最貼近遊戲感與導航主題。</small>
+          <div class="path">assets/design-previews/hero-fantasy.webp</div>
+        </div>
+      </article>
+      <article class="card">
+        <img src="assets/design-previews/hero-campus.webp" alt="校園協作感 hero 預覽">
+        <div>
+          <h3>校園協作感</h3>
+          <small>小組討論、策略卡與投票情境，適合教育研討會展示。</small>
+          <div class="path">assets/design-previews/hero-campus.webp</div>
+        </div>
+      </article>
+      <article class="card">
+        <img src="assets/design-previews/hero-map.webp" alt="抽象地圖感 hero 預覽">
+        <div>
+          <h3>抽象地圖感</h3>
+          <small>高質感路線、節點與策略卡意象，比較成熟、不以角色為主。</small>
+          <div class="path">assets/design-previews/hero-map.webp</div>
+        </div>
+      </article>
+    </section>
+
+    <h2>配色方向</h2>
+    <section class="grid">
+      <article class="card">
+        <img src="assets/design-previews/palette-balanced.webp" alt="中高活力配色預覽">
+        <div>
+          <h3>中高活力</h3>
+          <small>藍綠主軸，搭配珊瑚、金黃、紫色點綴。推薦作為第一版。</small>
+          <div class="path">assets/design-previews/palette-balanced.webp</div>
+        </div>
+      </article>
+      <article class="card">
+        <img src="assets/design-previews/palette-playful.webp" alt="高度繽紛配色預覽">
+        <div>
+          <h3>高度繽紛</h3>
+          <small>更遊戲化、更明亮，適合吸引學生，但整體更活潑。</small>
+          <div class="path">assets/design-previews/palette-playful.webp</div>
+        </div>
+      </article>
+      <article class="card">
+        <img src="assets/design-previews/palette-polished.webp" alt="創意沉穩配色預覽">
+        <div>
+          <h3>創意沉穩</h3>
+          <small>保留教育專業感，同時讓按鈕、狀態與卡片更鮮明。</small>
+          <div class="path">assets/design-previews/palette-polished.webp</div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

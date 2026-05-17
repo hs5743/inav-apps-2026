@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>人際導航員</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@600;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260510-admin-summary">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23176b87'/%3E%3Cpath d='M32 9l9 22 14 5-14 5-9 22-9-22-14-5 14-5z' fill='%23fff'/%3E%3C/svg%3E">
+</head>
+<body>
+  <div id="loading" class="loading hidden">
+    <div class="spinner"></div>
+    <strong id="loadingText">處理中...</strong>
+  </div>
+  <div id="toast" class="toast hidden"></div>
+  <div id="broadcastModal" class="broadcast-modal hidden">
+    <div class="broadcast-card">
+      <div class="broadcast-icon"><span class="material-symbols-outlined">campaign</span></div>
+      <div>
+        <p class="broadcast-label">組長廣播</p>
+        <h2 id="broadcastText">請留意組長提醒。</h2>
+      </div>
+      <button class="btn primary" type="button" id="closeBroadcastBtn">知道了</button>
+    </div>
+  </div>
+
+  <section id="loginScreen" class="screen active login-screen">
+    <div class="hero">
+      <div class="brand-pill"><span class="material-symbols-outlined">explore</span> 即時協作版</div>
+      <h1>人際導航員</h1>
+      <p>組長建立房間，組員用同一組代碼加入。讀懂情境、選擇策略、輪流說明理由，最後投票找出安全、尊重、有效的做法。</p>
+      <div class="map-hero">
+        <img src="assets/design-previews/hero-fantasy-banner.webp" alt="可愛角色一起在發光路線地圖上合作導航">
+        <div class="hero-shine"></div>
+      </div>
+      <div class="feature-strip" aria-label="網站特色">
+        <div class="feature-chip"><span class="material-symbols-outlined">groups</span><strong>4-8 人小組</strong><small>剛好能討論</small></div>
+        <div class="feature-chip"><span class="material-symbols-outlined">timer</span><strong>限時節奏</strong><small>等待有期待</small></div>
+        <div class="feature-chip"><span class="material-symbols-outlined">style</span><strong>策略牌卡</strong><small>把想法說清楚</small></div>
+        <div class="feature-chip"><span class="material-symbols-outlined">verified</span><strong>安全尊重有效</strong><small>一起判斷做法</small></div>
+      </div>
+    </div>
+
+    <div class="panel login-panel">
+      <div class="panel-title">
+        <span class="material-symbols-outlined">meeting_room</span>
+        <div>
+          <h2>進入遊戲房間</h2>
+          <p>房間資料會即時同步。</p>
+        </div>
+      </div>
+      <input id="playerName" class="field" maxlength="16" placeholder="你的姓名或座號">
+      <input id="roomCode" class="field uppercase" maxlength="24" placeholder="房間代碼，例如 A1">
+      <div>
+        <div class="small-label">選擇導航頭像</div>
+        <div id="avatarPicker" class="avatar-grid"></div>
+      </div>
+      <div class="button-grid">
+        <button class="btn primary" type="button" id="joinBtn"><span class="material-symbols-outlined">login</span>加入房間</button>
+        <button class="btn mint" type="button" id="createBtn"><span class="material-symbols-outlined">stars</span>建立房間</button>
+      </div>
+      <button class="btn ghost full" type="button" id="adminBtn"><span class="material-symbols-outlined">admin_panel_settings</span>教師後台</button>
+      <p class="privacy-note">請使用座號、暱稱或組別，不輸入學生真名。教師後台使用 Google 登入，不在網站公開密碼。</p>
+    </div>
+  </section>
+
+  <section id="gameScreen" class="screen game-screen">
+    <header class="topbar">
+      <div class="identity">
+        <div id="headerAvatar" class="avatar-icon"><img src="assets/avatars/avatar-1.webp" alt="晶晶怪"></div>
+        <div>
+          <strong>人際導航員</strong>
+          <div class="chips">
+            <span>房間 <b id="uiRoom">--</b></span>
+            <span>第 <b id="uiRound">0</b> 輪</span>
+            <span>積分 <b id="uiScore">0</b></span>
+            <span id="uiIdentity">你</span>
+          </div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span id="syncMeta" class="sync-meta">等待同步</span>
+        <button class="icon-btn" type="button" id="refreshBtn" title="重新整理"><span class="material-symbols-outlined">sync</span></button>
+        <button class="icon-btn" type="button" id="leaveBtn" title="離開"><span class="material-symbols-outlined">logout</span></button>
+      </div>
+    </header>
+
+    <div id="announcementBar" class="announcement"><span class="material-symbols-outlined">campaign</span><span id="uiMessage">等待房間資料...</span></div>
+
+    <main class="game-shell">
+      <aside class="side-column">
+        <section id="leaderPanel" class="panel hidden">
+          <div class="section-head"><h2><span class="material-symbols-outlined">admin_panel_settings</span>組長控制台</h2><span id="stageLabel" class="stage-pill">LOBBY</span></div>
+          <div id="leaderProgress" class="progress-list"></div>
+          <div class="leader-buttons">
+            <button id="btnStartRound" class="btn mint full" type="button" data-state="PLAYING"><span class="material-symbols-outlined">play_arrow</span>開始新任務</button>
+            <button id="btnVoting" class="btn amber full hidden" type="button" data-state="VOTING"><span class="material-symbols-outlined">record_voice_over</span>進入發表投票</button>
+            <button id="btnResult" class="btn primary full hidden" type="button" data-state="ROUND_RESULT"><span class="material-symbols-outlined">military_tech</span>公布本輪結果</button>
+            <button id="btnToggleTimer" class="btn ghost full hidden" type="button"><span class="material-symbols-outlined">pause_circle</span>暫停倒數討論</button>
+            <button id="btnGameOver" class="btn coral full" type="button" data-state="GAMEOVER"><span class="material-symbols-outlined">flag</span>結束遊戲</button>
+          </div>
+          <div class="broadcast-row">
+            <input id="broadcastInput" class="field" maxlength="80" placeholder="組長廣播提醒">
+            <button class="icon-btn" type="button" id="broadcastBtn" title="送出廣播"><span class="material-symbols-outlined">send</span></button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head"><h2><span class="material-symbols-outlined">groups</span>組員</h2></div>
+          <div id="playersList" class="players-list"></div>
+        </section>
+      </aside>
+
+      <section class="main-column">
+        <section id="scenarioPanel" class="scenario-card"></section>
+        <section class="panel action-panel">
+          <div class="action-head">
+            <div>
+              <h2 id="actionTitle">等待組長開始</h2>
+              <p id="actionHint">加入房間後，請等組長發布第一個任務。</p>
+            </div>
+            <div id="myBadge" class="stage-pill">玩家</div>
+          </div>
+          <div id="timerPanel" class="timer-panel hidden">
+            <span class="material-symbols-outlined">timer</span>
+            <strong id="timerText">0:00</strong>
+            <p id="timerHint">請依照組長指示進行。</p>
+          </div>
+          <div id="handWrapper" class="hidden"><div id="handArea" class="hand-grid"></div></div>
+          <div id="voteWrapper" class="hidden"><div id="voteArea" class="vote-area"></div></div>
+        </section>
+      </section>
+    </main>
+  </section>
+
+  <section id="adminScreen" class="screen admin-screen">
+    <div class="panel admin-panel">
+      <div class="section-head">
+        <h1>教師後台</h1>
+        <button class="btn ghost" type="button" id="backLoginBtn"><span class="material-symbols-outlined">arrow_back</span>返回</button>
+      </div>
+      <div class="admin-note">請用授權教師帳號登入。後台權限由系統規則保護，不使用前端密碼。</div>
+      <div class="admin-auth">
+        <button class="btn primary" type="button" id="adminLoginBtn"><span class="material-symbols-outlined">login</span>Google 登入教師後台</button>
+        <div id="adminUserLabel" class="sync-meta">尚未登入</div>
+      </div>
+      <div id="adminDashboard" class="hidden">
+        <div class="button-grid">
+          <button class="btn primary" type="button" id="loadAdminBtn"><span class="material-symbols-outlined">sync</span>重新整理房間</button>
+          <button class="btn ghost" type="button" id="adminLogoutBtn"><span class="material-symbols-outlined">logout</span>登出</button>
+        </div>
+        <div id="adminSummary" class="admin-summary"></div>
+        <div id="adminRoomDetail" class="admin-room-detail hidden"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>房間</th><th>階段</th><th>輪次</th><th>人數</th><th>更新</th><th>摘要與匯出</th><th></th></tr></thead>
+            <tbody id="adminRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="cardModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="section-head">
+        <span id="modalCategory" class="stage-pill"></span>
+        <button class="icon-btn" type="button" id="closeModalBtn" title="關閉"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <h2 id="modalTitle"></h2>
+      <p id="modalGuide"></p>
+      <div class="detail-grid">
+        <div><span>培養能力</span><strong id="modalSkill"></strong></div>
+        <div><span>適用時機</span><strong id="modalTip"></strong></div>
+      </div>
+      <div id="blankCardBox" class="blank-box hidden">
+        <label for="blankCardText">請寫下你的空白絕招</label>
+        <textarea id="blankCardText" class="field" maxlength="80" placeholder="例如：我會找安全的大人陪我一起說明。"></textarea>
+      </div>
+      <div class="button-grid">
+        <button class="btn ghost" type="button" id="cancelCardBtn">取消</button>
+        <button class="btn primary" type="button" id="playCardBtn"><span class="material-symbols-outlined">publish</span>選這張出牌</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="data.js?v=20260510-admin-summary"></script>
+  <script type="module" src="app.js?v=20260510-admin-summary"></script>
+</body>
+</html>
